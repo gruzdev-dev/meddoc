@@ -8,7 +8,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the application configuration
 type Config struct {
 	Server struct {
 		Host string `yaml:"host"`
@@ -22,6 +21,9 @@ type Config struct {
 		Level  string `yaml:"level"`
 		Format string `yaml:"format"`
 	} `yaml:"log"`
+	JWT struct {
+		Secret string `yaml:"secret"`
+	} `yaml:"jwt"`
 }
 
 func (c *Config) validate() error {
@@ -43,10 +45,12 @@ func (c *Config) validate() error {
 	if c.Log.Format == "" {
 		c.Log.Format = "json"
 	}
+	if c.JWT.Secret == "" {
+		return fmt.Errorf("jwt secret is required")
+	}
 	return nil
 }
 
-// Load loads configuration from file and environment variables
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -58,7 +62,6 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("error parsing config file: %w", err)
 	}
 
-	// Override with environment variables if set
 	if host := os.Getenv("SERVER_HOST"); host != "" {
 		cfg.Server.Host = host
 	}
@@ -78,6 +81,9 @@ func Load(path string) (*Config, error) {
 	}
 	if format := os.Getenv("LOG_FORMAT"); format != "" {
 		cfg.Log.Format = format
+	}
+	if secret := os.Getenv("JWT_SECRET"); secret != "" {
+		cfg.JWT.Secret = secret
 	}
 
 	if err := cfg.validate(); err != nil {

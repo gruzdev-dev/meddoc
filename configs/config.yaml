@@ -8,4 +8,7 @@ mongodb:
 
 log:
   level: "info"
-  format: "json" 
+  format: "json"
+
+jwt:
+  secret: "your-256-bit-secret" # В продакшене использовать безопасный секрет 
