@@ -31,8 +31,8 @@ func (h *DocumentHandler) CreateDocument(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	doc.UserID = context.GetUserID(r)
-	if err := h.documentService.CreateDocument(r.Context(), doc); err != nil {
+	userID := context.GetUserID(r)
+	if err := h.documentService.CreateDocument(r.Context(), doc, userID); err != nil {
 		http.Error(w, "failed to create document", http.StatusInternalServerError)
 		return
 	}
@@ -76,6 +76,6 @@ func (h *DocumentHandler) RegisterRoutes(router *mux.Router) {
 	docs.Use(middleware.Auth(h.userService))
 
 	docs.HandleFunc("", h.CreateDocument).Methods(http.MethodPost)
+	docs.HandleFunc("", h.GetUserDocuments).Methods(http.MethodGet)
 	docs.HandleFunc("/{id}", h.GetDocument).Methods(http.MethodGet)
-	docs.HandleFunc("/user", h.GetUserDocuments).Methods(http.MethodGet)
 }

@@ -19,12 +19,11 @@ type Document struct {
 }
 
 type DocumentCreation struct {
-	Title       string
-	Description string
-	Date        string
-	File        string
-	Category    string
-	Priority    int
-	Content     map[string]string
-	UserID      string
+	Title       string            `json:"title"`
+	Description string            `json:"description,omitempty"`
+	Date        string            `json:"date,omitempty"`
+	File        string            `json:"file,omitempty"`
+	Category    string            `json:"category,omitempty"`
+	Priority    int               `json:"priority,omitempty"`
+	Content     map[string]string `json:"content,omitempty"`
 }

@@ -28,16 +28,16 @@ func NewService(repo DocumentRepository) *Service {
 	}
 }
 
-func (s *Service) CreateDocument(ctx context.Context, req models.DocumentCreation) error {
+func (s *Service) CreateDocument(ctx context.Context, data models.DocumentCreation, userID string) error {
 	doc := &models.Document{
-		Title:       req.Title,
-		Description: req.Description,
-		Date:        req.Date,
-		File:        req.File,
-		Category:    req.Category,
-		Priority:    req.Priority,
-		Content:     req.Content,
-		UserID:      req.UserID,
+		Title:       data.Title,
+		Description: data.Description,
+		Date:        data.Date,
+		File:        data.File,
+		Category:    data.Category,
+		Priority:    data.Priority,
+		Content:     data.Content,
+		UserID:      userID,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}

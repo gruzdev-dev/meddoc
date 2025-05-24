@@ -10,6 +10,7 @@ import (
 	"github.com/gruzdev-dev/meddoc/app/handlers"
 	"github.com/gruzdev-dev/meddoc/app/repositories"
 	"github.com/gruzdev-dev/meddoc/app/server"
+	"github.com/gruzdev-dev/meddoc/app/services/document"
 	"github.com/gruzdev-dev/meddoc/app/services/user"
 	"github.com/gruzdev-dev/meddoc/database"
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
@@ -48,7 +49,11 @@ func main() {
 
 	userRepo := repositories.NewUserRepository(mongoDB.Database().Collection("users"))
 	userService := user.NewUserServiceFromConfig(userRepo, cfg)
-	handlers := handlers.NewHandlers(userService)
+
+	documentRepo := repositories.NewDocumentRepository(mongoDB.Database().Collection("documents"))
+	documentService := document.NewService(documentRepo)
+
+	handlers := handlers.NewHandlers(userService, documentService)
 
 	srv := server.NewServer(cfg, handlers)
 	if err := srv.Start(); err != nil {

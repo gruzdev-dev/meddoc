@@ -93,6 +93,8 @@ paths:
           description: Unauthorized
         '500':
           description: Internal server error
+
+  /documents/user:
     get:
       summary: Get all user documents
       security:
