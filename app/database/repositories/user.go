@@ -5,15 +5,11 @@ import (
 	"errors"
 	"time"
 
+	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-)
-
-var (
-	ErrUserNotFound = errors.New("user not found")
-	ErrUserExists   = errors.New("user already exists")
 )
 
 type UserRepository struct {
@@ -39,7 +35,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	var existingUser mongoUser
 	err := r.collection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&existingUser)
 	if err == nil {
-		return ErrUserExists
+		return apperrors.ErrUserExists
 	} else if !errors.Is(err, mongo.ErrNoDocuments) {
 		return err
 	}
@@ -65,7 +61,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 	var mongoUser mongoUser
 	err := r.collection.FindOne(ctx, bson.M{"email": email}).Decode(&mongoUser)
 	if errors.Is(err, mongo.ErrNoDocuments) {
-		return nil, ErrUserNotFound
+		return nil, apperrors.ErrUserNotFound
 	}
 	if err != nil {
 		return nil, err

@@ -9,7 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gruzdev-dev/meddoc/app/config"
-	"github.com/gruzdev-dev/meddoc/app/database/repositories"
+	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
 )
 
@@ -60,8 +60,8 @@ func (s *UserService) Register(ctx context.Context, reg models.UserRegistration)
 	}
 
 	if err := s.repo.Create(ctx, user); err != nil {
-		if errors.Is(err, repositories.ErrUserExists) {
-			return nil, ErrUserExists
+		if errors.Is(err, apperrors.ErrUserExists) {
+			return nil, apperrors.ErrUserExists
 		}
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*model
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-		return nil, errors.New("invalid credentials")
+		return nil, apperrors.ErrInvalidCredentials
 	}
 
 	return s.generateTokenPair(user)
@@ -89,7 +89,7 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*m
 	})
 
 	if err != nil || !token.Valid {
-		return nil, errors.New("invalid refresh token")
+		return nil, apperrors.ErrInvalidRefreshToken
 	}
 
 	user, err := s.repo.GetByID(ctx, claims.Subject)
@@ -135,7 +135,7 @@ func (s *UserService) ValidateToken(tokenString string) (string, error) {
 	})
 
 	if err != nil || !token.Valid {
-		return "", errors.New("invalid token")
+		return "", apperrors.ErrInvalidToken
 	}
 
 	return claims.Subject, nil
