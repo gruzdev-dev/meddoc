@@ -98,7 +98,6 @@ func TestService_UploadFile(t *testing.T) {
 	mockStorage := NewMockStorage(ctrl)
 	service := NewService(mockRepo, mockStorage)
 
-	// Мокаем generateRandomName для предсказуемых ID
 	originalGenerateRandomName := generateRandomName
 	defer func() { generateRandomName = originalGenerateRandomName }()
 	generateRandomName = func() (string, error) {
