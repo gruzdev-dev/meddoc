@@ -3,7 +3,6 @@ package config
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -69,40 +68,6 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("error parsing config file: %w", err)
-	}
-
-	if host := os.Getenv("SERVER_HOST"); host != "" {
-		cfg.Server.Host = host
-	}
-	if port := os.Getenv("SERVER_PORT"); port != "" {
-		if p, err := strconv.Atoi(port); err == nil {
-			cfg.Server.Port = p
-		}
-	}
-	if uri := os.Getenv("MONGODB_URI"); uri != "" {
-		cfg.MongoDB.URI = uri
-	}
-	if db := os.Getenv("MONGODB_DATABASE"); db != "" {
-		cfg.MongoDB.Database = db
-	}
-	if level := os.Getenv("LOG_LEVEL"); level != "" {
-		cfg.Log.Level = level
-	}
-	if format := os.Getenv("LOG_FORMAT"); format != "" {
-		cfg.Log.Format = format
-	}
-	if secret := os.Getenv("AUTH_SECRET"); secret != "" {
-		cfg.Auth.Secret = secret
-	}
-	if accessTTL := os.Getenv("AUTH_ACCESS_TOKEN_TTL"); accessTTL != "" {
-		if duration, err := time.ParseDuration(accessTTL); err == nil {
-			cfg.Auth.AccessTokenTTL = duration
-		}
-	}
-	if refreshTTL := os.Getenv("AUTH_REFRESH_TOKEN_TTL"); refreshTTL != "" {
-		if duration, err := time.ParseDuration(refreshTTL); err == nil {
-			cfg.Auth.RefreshTokenTTL = duration
-		}
 	}
 
 	if err := cfg.validate(); err != nil {

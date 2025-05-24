@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gruzdev-dev/meddoc/app/config"
@@ -17,7 +16,7 @@ import (
 type UserRepository interface {
 	Create(ctx context.Context, user *models.User) error
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
-	GetByID(ctx context.Context, id primitive.ObjectID) (*models.User, error)
+	GetByID(ctx context.Context, id string) (*models.User, error)
 }
 
 type Config struct {
@@ -95,12 +94,7 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*m
 		return nil, errors.New("invalid refresh token")
 	}
 
-	userID, err := primitive.ObjectIDFromHex(claims.Subject)
-	if err != nil {
-		return nil, errors.New("invalid user ID in token")
-	}
-
-	user, err := s.repo.GetByID(ctx, userID)
+	user, err := s.repo.GetByID(ctx, claims.Subject)
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +104,7 @@ func (s *UserService) RefreshToken(ctx context.Context, refreshToken string) (*m
 
 func (s *UserService) generateTokenPair(user *models.User) (*models.TokenPair, error) {
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.ID.Hex(),
+		"sub": user.ID,
 		"exp": time.Now().Add(s.accessTokenTTL).Unix(),
 	})
 
@@ -120,7 +114,7 @@ func (s *UserService) generateTokenPair(user *models.User) (*models.TokenPair, e
 	}
 
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.ID.Hex(),
+		"sub": user.ID,
 		"exp": time.Now().Add(s.refreshTokenTTL).Unix(),
 	})
 
