@@ -2,14 +2,10 @@ package document
 
 import (
 	"context"
-	"errors"
 	"time"
 
+	"github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
-)
-
-var (
-	ErrAccessDenied = errors.New("access denied")
 )
 
 type Service struct {
@@ -48,7 +44,7 @@ func (s *Service) GetDocument(ctx context.Context, id string, userID string) (*m
 	}
 
 	if doc.UserID != userID {
-		return nil, ErrAccessDenied
+		return nil, errors.ErrAccessDenied
 	}
 
 	return doc, nil
@@ -65,7 +61,7 @@ func (s *Service) DeleteDocument(ctx context.Context, id string, userID string) 
 	}
 
 	if doc.UserID != userID {
-		return ErrAccessDenied
+		return errors.ErrAccessDenied
 	}
 
 	return s.repo.Delete(ctx, id)
@@ -77,7 +73,7 @@ func (s *Service) UpdateDocument(ctx context.Context, id string, update models.D
 		return nil, err
 	}
 	if doc.UserID != userID {
-		return nil, ErrAccessDenied
+		return nil, errors.ErrAccessDenied
 	}
 	if err := s.repo.Update(ctx, id, update); err != nil {
 		return nil, err

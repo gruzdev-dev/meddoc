@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 
+	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
 	"github.com/gruzdev-dev/meddoc/app/server/context"
 	"github.com/gruzdev-dev/meddoc/app/server/middleware"
@@ -52,7 +53,7 @@ func (h *DocumentHandler) GetDocument(w http.ResponseWriter, r *http.Request) {
 
 	doc, err := h.documentService.GetDocument(r.Context(), id, userID)
 	if err != nil {
-		if errors.Is(err, document.ErrAccessDenied) {
+		if errors.Is(err, apperrors.ErrAccessDenied) {
 			http.Error(w, "access denied", http.StatusForbidden)
 			return
 		}
@@ -82,11 +83,11 @@ func (h *DocumentHandler) DeleteDocument(w http.ResponseWriter, r *http.Request)
 	userID := context.GetUserID(r)
 
 	if err := h.documentService.DeleteDocument(r.Context(), id, userID); err != nil {
-		if errors.Is(err, document.ErrAccessDenied) {
+		if errors.Is(err, apperrors.ErrAccessDenied) {
 			http.Error(w, "access denied", http.StatusForbidden)
 			return
 		}
-		if errors.Is(err, document.ErrDocumentNotFound) {
+		if errors.Is(err, apperrors.ErrDocumentNotFound) {
 			http.Error(w, "document not found", http.StatusNotFound)
 			return
 		}
@@ -110,11 +111,11 @@ func (h *DocumentHandler) UpdateDocument(w http.ResponseWriter, r *http.Request)
 
 	updatedDoc, err := h.documentService.UpdateDocument(r.Context(), id, update, userID)
 	if err != nil {
-		if errors.Is(err, document.ErrAccessDenied) {
+		if errors.Is(err, apperrors.ErrAccessDenied) {
 			http.Error(w, "access denied", http.StatusForbidden)
 			return
 		}
-		if errors.Is(err, document.ErrDocumentNotFound) {
+		if errors.Is(err, apperrors.ErrDocumentNotFound) {
 			http.Error(w, "document not found", http.StatusNotFound)
 			return
 		}
