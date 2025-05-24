@@ -56,15 +56,12 @@ func main() {
 	}()
 
 	// Initialize repositories
-	docRepo := repository.NewDocumentRepository(mongoDB.Database())
 	userRepo := repository.NewUserRepository(mongoDB.Database().Collection("users"))
 
 	// Initialize services
-	docService := appservice.NewDocumentService(docRepo)
 	userService := appservice.NewUserService(userRepo, cfg.JWT.Secret)
 
 	// Initialize handlers
-	docHandler := handler.NewDocumentHandler(docService)
 	userHandler := handler.NewUserHandler(userService)
 
 	// Initialize router
@@ -80,7 +77,6 @@ func main() {
 	// Initialize routes
 	api := router.Group("/api/v1")
 	{
-		docHandler.RegisterRoutes(api)
 		userHandler.RegisterRoutes(api)
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{"status": "ok"})
