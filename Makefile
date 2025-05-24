@@ -1,4 +1,4 @@
-.PHONY: up test lint deps mocks test-coverage help
+.PHONY: up down lint deps test test-unit test-integration test-up test-down 
 
 up:
 	docker compose up -d --build
@@ -6,12 +6,24 @@ up:
 down:
 	docker compose down -v --remove-orphans
 
-test:
-	go test -v ./...
-
 lint:
 	golangci-lint run
 
 deps:
 	go mod download
 	go mod tidy
+
+test: test-unit test-integration
+
+test-unit:
+	go test -v ./...
+
+test-up:
+	docker compose up -d mongodb
+
+test-down:
+	docker compose down mongodb
+
+test-integration: test-up
+	go test -v ./tests/... -tags=integration
+	$(MAKE) test-down
