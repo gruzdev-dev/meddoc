@@ -11,6 +11,7 @@ import (
 
 	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
+	"github.com/gruzdev-dev/meddoc/pkg/logger"
 )
 
 type DocumentRepository struct {
@@ -95,7 +96,11 @@ func (r *DocumentRepository) GetByUserID(ctx context.Context, userID string) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			logger.Error("failed to close cursor", err)
+		}
+	}()
 
 	var documents []*models.Document
 	for cursor.Next(ctx) {

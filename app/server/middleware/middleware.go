@@ -89,7 +89,11 @@ func Compression() func(http.Handler) http.Handler {
 			}
 
 			gz := gzip.NewWriter(w)
-			defer gz.Close()
+			defer func() {
+				if err := gz.Close(); err != nil {
+					logger.Error("failed to close gzip writer", err)
+				}
+			}()
 
 			w.Header().Set("Content-Encoding", "gzip")
 			next.ServeHTTP(gzipResponseWriter{Writer: gz, ResponseWriter: w}, r)
@@ -133,7 +137,10 @@ func RequestID() func(http.Handler) http.Handler {
 
 func generateRequestID() string {
 	b := make([]byte, requestIDLength)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		logger.Error("failed to generate random bytes", err)
+		return ""
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
 
