@@ -3,9 +3,17 @@ package file
 import (
 	"context"
 	"io"
+	"mime/multipart"
 
 	"github.com/gruzdev-dev/meddoc/app/models"
 )
+
+type FileOpener interface {
+	Open() (multipart.File, error)
+	GetFilename() string
+	GetHeader() map[string][]string
+	GetSize() int64
+}
 
 type Storage interface {
 	Upload(ctx context.Context, filename string, reader io.Reader) (string, error)

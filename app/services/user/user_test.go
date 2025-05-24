@@ -181,7 +181,6 @@ func TestUserService_RefreshToken(t *testing.T) {
 		Name:  "Test User",
 	}
 
-	// Generate a valid refresh token
 	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
 		"exp": time.Now().Add(cfg.RefreshTokenTTL).Unix(),
@@ -248,7 +247,6 @@ func TestUserService_ValidateToken(t *testing.T) {
 	}
 	service := NewUserService(nil, cfg)
 
-	// Generate a valid token
 	validToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": "user-123",
 		"exp": time.Now().Add(cfg.AccessTokenTTL).Unix(),

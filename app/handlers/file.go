@@ -43,13 +43,13 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	file, header, err := r.FormFile("file")
+	fileReader, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "error retrieving file", http.StatusBadRequest)
 		return
 	}
 	defer func() {
-		if err := file.Close(); err != nil {
+		if err := fileReader.Close(); err != nil {
 			logger.Error("failed to close file", err)
 		}
 	}()
@@ -67,7 +67,7 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		"user_id":   userID,
 	})
 
-	uploadedFile, err := h.fileService.UploadFile(r.Context(), header, userID)
+	uploadedFile, err := h.fileService.UploadFile(r.Context(), &file.FileHeaderAdapter{FileHeader: header}, userID)
 	if err != nil {
 		logger.Error("failed to upload file", err)
 		http.Error(w, "failed to upload file", http.StatusInternalServerError)

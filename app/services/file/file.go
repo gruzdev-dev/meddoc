@@ -7,7 +7,6 @@ import (
 	stderrors "errors"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"path/filepath"
 
 	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
@@ -32,7 +31,7 @@ func NewService(repo FileRepository, localStorage Storage) *Service {
 	}
 }
 
-func generateRandomName() (string, error) {
+var generateRandomName = func() (string, error) {
 	bytes := make([]byte, 16)
 	if _, err := rand.Read(bytes); err != nil {
 		return "", err
@@ -71,13 +70,23 @@ func (s *Service) uploadLargeFile(generatedName, ext string, src io.Reader) (str
 	return fileID + ext, nil
 }
 
-func (s *Service) UploadFile(ctx context.Context, file *multipart.FileHeader, userID string) (*models.File, error) {
+func (s *Service) UploadFile(ctx context.Context, file FileOpener, userID string) (*models.File, error) {
 	generatedName, err := generateRandomName()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random name: %w", err)
 	}
 
-	ext := determineFileExtension(file.Filename, file.Header.Get("Content-Type"))
+	filename := file.GetFilename()
+	header := file.GetHeader()
+	contentTypes, ok := header["Content-Type"]
+	if filename == "" {
+		return nil, fmt.Errorf("filename is empty")
+	}
+	if !ok || len(contentTypes) == 0 || contentTypes[0] == "" {
+		return nil, fmt.Errorf("content type is missing")
+	}
+
+	ext := determineFileExtension(filename, contentTypes[0])
 
 	src, err := file.Open()
 	if err != nil {
@@ -91,7 +100,7 @@ func (s *Service) UploadFile(ctx context.Context, file *multipart.FileHeader, us
 
 	var fileID string
 	var storageType string
-	if file.Size < smallFileThreshold {
+	if file.GetSize() < smallFileThreshold {
 		fileID, err = s.uploadSmallFile(ctx, generatedName, ext, src)
 		storageType = "local"
 	} else {
