@@ -13,10 +13,6 @@ import (
 	"github.com/gruzdev-dev/meddoc/app/models"
 )
 
-var (
-	ErrUserExists = errors.New("user already exists")
-)
-
 type Config struct {
 	JWTSecret       string
 	AccessTokenTTL  time.Duration

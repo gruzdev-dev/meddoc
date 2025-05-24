@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gruzdev-dev/meddoc/app/models"
 	userservice "github.com/gruzdev-dev/meddoc/app/services/user"
+	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 )
 
 type UserHandler struct {
@@ -29,7 +30,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.userService.Register(r.Context(), reg)
 	if err != nil {
-		if errors.Is(err, userservice.ErrUserExists) {
+		if errors.Is(err, apperrors.ErrUserExists) {
 			http.Error(w, "user already exists", http.StatusConflict)
 			return
 		}
