@@ -128,3 +128,64 @@ func (r *DocumentRepository) GetByUserID(ctx context.Context, userID string) ([]
 
 	return documents, nil
 }
+
+func (r *DocumentRepository) Delete(ctx context.Context, id string) error {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+
+	result, err := r.collection.DeleteOne(ctx, bson.M{"_id": objectID})
+	if err != nil {
+		return err
+	}
+
+	if result.DeletedCount == 0 {
+		return ErrDocumentNotFound
+	}
+
+	return nil
+}
+
+func (r *DocumentRepository) Update(ctx context.Context, id string, update models.DocumentUpdate) error {
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return err
+	}
+	set := bson.M{}
+	if update.Title != nil {
+		set["title"] = *update.Title
+	}
+	if update.Description != nil {
+		set["description"] = *update.Description
+	}
+	if update.Date != nil {
+		set["date"] = *update.Date
+	}
+	if update.File != nil {
+		set["file"] = *update.File
+	}
+	if update.Category != nil {
+		set["category"] = *update.Category
+	}
+	if update.Priority != nil {
+		set["priority"] = *update.Priority
+	}
+	if update.Content != nil {
+		set["content"] = update.Content
+	}
+	set["updated_at"] = time.Now()
+
+	result, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"_id": objectID},
+		bson.M{"$set": set},
+	)
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return ErrDocumentNotFound
+	}
+	return nil
+}

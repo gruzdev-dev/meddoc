@@ -16,6 +16,8 @@ type DocumentRepository interface {
 	Create(ctx context.Context, doc *models.Document) error
 	GetByID(ctx context.Context, id string) (*models.Document, error)
 	GetByUserID(ctx context.Context, userID string) ([]*models.Document, error)
+	Delete(ctx context.Context, id string) error
+	Update(ctx context.Context, id string, update models.DocumentUpdate) error
 }
 
 type Service struct {
@@ -28,7 +30,7 @@ func NewService(repo DocumentRepository) *Service {
 	}
 }
 
-func (s *Service) CreateDocument(ctx context.Context, data models.DocumentCreation, userID string) error {
+func (s *Service) CreateDocument(ctx context.Context, data models.DocumentCreation, userID string) (*models.Document, error) {
 	doc := &models.Document{
 		Title:       data.Title,
 		Description: data.Description,
@@ -41,7 +43,10 @@ func (s *Service) CreateDocument(ctx context.Context, data models.DocumentCreati
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
-	return s.repo.Create(ctx, doc)
+	if err := s.repo.Create(ctx, doc); err != nil {
+		return nil, err
+	}
+	return doc, nil
 }
 
 func (s *Service) GetDocument(ctx context.Context, id string, userID string) (*models.Document, error) {
@@ -59,4 +64,31 @@ func (s *Service) GetDocument(ctx context.Context, id string, userID string) (*m
 
 func (s *Service) GetUserDocuments(ctx context.Context, userID string) ([]*models.Document, error) {
 	return s.repo.GetByUserID(ctx, userID)
+}
+
+func (s *Service) DeleteDocument(ctx context.Context, id string, userID string) error {
+	doc, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if doc.UserID != userID {
+		return ErrAccessDenied
+	}
+
+	return s.repo.Delete(ctx, id)
+}
+
+func (s *Service) UpdateDocument(ctx context.Context, id string, update models.DocumentUpdate, userID string) (*models.Document, error) {
+	doc, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if doc.UserID != userID {
+		return nil, ErrAccessDenied
+	}
+	if err := s.repo.Update(ctx, id, update); err != nil {
+		return nil, err
+	}
+	return s.repo.GetByID(ctx, id)
 }

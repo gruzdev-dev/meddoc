@@ -27,3 +27,13 @@ type DocumentCreation struct {
 	Priority    int               `json:"priority,omitempty"`
 	Content     map[string]string `json:"content,omitempty"`
 }
+
+type DocumentUpdate struct {
+	Title       *string           `json:"title,omitempty"`
+	Description *string           `json:"description,omitempty"`
+	Date        *string           `json:"date,omitempty"`
+	File        *string           `json:"file,omitempty"`
+	Category    *string           `json:"category,omitempty"`
+	Priority    *int              `json:"priority,omitempty"`
+	Content     map[string]string `json:"content,omitempty"`
+}
