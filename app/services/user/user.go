@@ -9,24 +9,45 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/gruzdev-dev/meddoc/app/config"
 	"github.com/gruzdev-dev/meddoc/app/models"
 	"github.com/gruzdev-dev/meddoc/app/repositories"
 )
 
+type UserRepository interface {
+	Create(ctx context.Context, user *models.User) error
+	GetByEmail(ctx context.Context, email string) (*models.User, error)
+	GetByID(ctx context.Context, id primitive.ObjectID) (*models.User, error)
+}
+
+type Config struct {
+	JWTSecret       string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
+}
+
 type UserService struct {
-	repo            *repositories.UserRepository
+	repo            UserRepository
 	jwtSecret       []byte
 	accessTokenTTL  time.Duration
 	refreshTokenTTL time.Duration
 }
 
-func NewUserService(repo *repositories.UserRepository, jwtSecret string) *UserService {
+func NewUserService(repo UserRepository, cfg Config) *UserService {
 	return &UserService{
 		repo:            repo,
-		jwtSecret:       []byte(jwtSecret),
-		accessTokenTTL:  15 * time.Minute,
-		refreshTokenTTL: 720 * time.Hour, // 30 days
+		jwtSecret:       []byte(cfg.JWTSecret),
+		accessTokenTTL:  cfg.AccessTokenTTL,
+		refreshTokenTTL: cfg.RefreshTokenTTL,
 	}
+}
+
+func NewUserServiceFromConfig(repo UserRepository, cfg *config.Config) *UserService {
+	return NewUserService(repo, Config{
+		JWTSecret:       cfg.Auth.Secret,
+		AccessTokenTTL:  cfg.Auth.AccessTokenTTL,
+		RefreshTokenTTL: cfg.Auth.RefreshTokenTTL,
+	})
 }
 
 func (s *UserService) Register(ctx context.Context, reg models.UserRegistration) (*models.User, error) {

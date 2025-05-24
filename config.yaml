@@ -10,5 +10,7 @@ log:
   level: "info"
   format: "json"
 
-jwt:
-  secret: "your-256-bit-secret"
+auth:
+  secret: "BqJSM9iEneFFsSKumGIUGgpGzN13t6gIeJYhE6392AI="
+  access_token_ttl: "15m"
+  refresh_token_ttl: "720h"

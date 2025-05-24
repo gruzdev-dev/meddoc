@@ -47,7 +47,7 @@ func main() {
 	}()
 
 	userRepo := repositories.NewUserRepository(mongoDB.Database().Collection("users"))
-	userService := user.NewUserService(userRepo, cfg.JWT.Secret)
+	userService := user.NewUserServiceFromConfig(userRepo, cfg)
 	handlers := handlers.NewHandlers(userService)
 
 	srv := server.NewServer(cfg, handlers)

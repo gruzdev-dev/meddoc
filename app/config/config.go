@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -21,9 +22,11 @@ type Config struct {
 		Level  string `yaml:"level"`
 		Format string `yaml:"format"`
 	} `yaml:"log"`
-	JWT struct {
-		Secret string `yaml:"secret"`
-	} `yaml:"jwt"`
+	Auth struct {
+		Secret          string        `yaml:"secret"`
+		AccessTokenTTL  time.Duration `yaml:"access_token_ttl"`
+		RefreshTokenTTL time.Duration `yaml:"refresh_token_ttl"`
+	} `yaml:"auth"`
 }
 
 func (c *Config) validate() error {
@@ -45,8 +48,14 @@ func (c *Config) validate() error {
 	if c.Log.Format == "" {
 		c.Log.Format = "json"
 	}
-	if c.JWT.Secret == "" {
-		return fmt.Errorf("jwt secret is required")
+	if c.Auth.Secret == "" {
+		return fmt.Errorf("auth secret is required")
+	}
+	if c.Auth.AccessTokenTTL == 0 {
+		return fmt.Errorf("access token TTL is required")
+	}
+	if c.Auth.RefreshTokenTTL == 0 {
+		return fmt.Errorf("refresh token TTL is required")
 	}
 	return nil
 }
@@ -82,8 +91,18 @@ func Load(path string) (*Config, error) {
 	if format := os.Getenv("LOG_FORMAT"); format != "" {
 		cfg.Log.Format = format
 	}
-	if secret := os.Getenv("JWT_SECRET"); secret != "" {
-		cfg.JWT.Secret = secret
+	if secret := os.Getenv("AUTH_SECRET"); secret != "" {
+		cfg.Auth.Secret = secret
+	}
+	if accessTTL := os.Getenv("AUTH_ACCESS_TOKEN_TTL"); accessTTL != "" {
+		if duration, err := time.ParseDuration(accessTTL); err == nil {
+			cfg.Auth.AccessTokenTTL = duration
+		}
+	}
+	if refreshTTL := os.Getenv("AUTH_REFRESH_TOKEN_TTL"); refreshTTL != "" {
+		if duration, err := time.ParseDuration(refreshTTL); err == nil {
+			cfg.Auth.RefreshTokenTTL = duration
+		}
 	}
 
 	if err := cfg.validate(); err != nil {
