@@ -1,0 +1,16 @@
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "meddoc"
+
+log:
+  level: "info"
+  format: "json"
+
+auth:
+  secret: "test-secret"
+  access_token_ttl: "1m"
+  refresh_token_ttl: "10m"

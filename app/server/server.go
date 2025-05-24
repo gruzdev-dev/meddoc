@@ -11,9 +11,9 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/gruzdev-dev/meddoc/config"
 	"github.com/gruzdev-dev/meddoc/app/handlers"
 	"github.com/gruzdev-dev/meddoc/app/server/middleware"
+	"github.com/gruzdev-dev/meddoc/config"
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
 )
 
