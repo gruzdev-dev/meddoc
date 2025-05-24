@@ -7,6 +7,7 @@ down:
 	docker compose down -v --remove-orphans
 
 lint:
+	go fmt ./...
 	golangci-lint run
 
 deps:

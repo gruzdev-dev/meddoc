@@ -8,9 +8,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/gruzdev-dev/meddoc/config"
 	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
+	"github.com/gruzdev-dev/meddoc/config"
 )
 
 type Config struct {
