@@ -13,8 +13,8 @@ import (
 
 	"github.com/gruzdev-dev/meddoc/app/config"
 	"github.com/gruzdev-dev/meddoc/app/handlers"
-	"github.com/gruzdev-dev/meddoc/pkg/logger"
 	"github.com/gruzdev-dev/meddoc/app/server/middleware"
+	"github.com/gruzdev-dev/meddoc/pkg/logger"
 )
 
 type Server struct {

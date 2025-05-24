@@ -2,19 +2,19 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/gruzdev-dev/meddoc/app/models"
-	"github.com/gruzdev-dev/meddoc/app/repositories"
-	"github.com/gruzdev-dev/meddoc/app/services/user"
+	userservice "github.com/gruzdev-dev/meddoc/app/services/user"
 )
 
 type UserHandler struct {
-	userService *user.UserService
+	userService *userservice.UserService
 }
 
-func NewUserHandler(userService *user.UserService) *UserHandler {
+func NewUserHandler(userService *userservice.UserService) *UserHandler {
 	return &UserHandler{
 		userService: userService,
 	}
@@ -29,7 +29,7 @@ func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.userService.Register(r.Context(), reg)
 	if err != nil {
-		if err == repositories.ErrUserExists {
+		if errors.Is(err, userservice.ErrUserExists) {
 			http.Error(w, "user already exists", http.StatusConflict)
 			return
 		}

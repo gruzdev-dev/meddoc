@@ -9,15 +9,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/gruzdev-dev/meddoc/app/config"
+	"github.com/gruzdev-dev/meddoc/app/database/repositories"
 	"github.com/gruzdev-dev/meddoc/app/models"
-	"github.com/gruzdev-dev/meddoc/app/repositories"
 )
 
-type UserRepository interface {
-	Create(ctx context.Context, user *models.User) error
-	GetByEmail(ctx context.Context, email string) (*models.User, error)
-	GetByID(ctx context.Context, id string) (*models.User, error)
-}
+var (
+	ErrUserExists = errors.New("user already exists")
+)
 
 type Config struct {
 	JWTSecret       string
@@ -63,7 +61,7 @@ func (s *UserService) Register(ctx context.Context, reg models.UserRegistration)
 
 	if err := s.repo.Create(ctx, user); err != nil {
 		if errors.Is(err, repositories.ErrUserExists) {
-			return nil, err
+			return nil, ErrUserExists
 		}
 		return nil, err
 	}

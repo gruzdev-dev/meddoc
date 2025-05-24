@@ -5,14 +5,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/gruzdev-dev/meddoc/app/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-)
 
-var (
-	ErrDocumentNotFound = errors.New("document not found")
+	"github.com/gruzdev-dev/meddoc/app/models"
+	"github.com/gruzdev-dev/meddoc/app/services/document"
 )
 
 type DocumentRepository struct {
@@ -70,8 +68,8 @@ func (r *DocumentRepository) GetByID(ctx context.Context, id string) (*models.Do
 
 	var mongoDoc mongoDocument
 	err = r.collection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&mongoDoc)
-	if err == mongo.ErrNoDocuments {
-		return nil, ErrDocumentNotFound
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, document.ErrDocumentNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -141,7 +139,7 @@ func (r *DocumentRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	if result.DeletedCount == 0 {
-		return ErrDocumentNotFound
+		return document.ErrDocumentNotFound
 	}
 
 	return nil
@@ -185,7 +183,7 @@ func (r *DocumentRepository) Update(ctx context.Context, id string, update model
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return ErrDocumentNotFound
+		return document.ErrDocumentNotFound
 	}
 	return nil
 }

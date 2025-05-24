@@ -7,12 +7,12 @@ import (
 	"time"
 
 	"github.com/gruzdev-dev/meddoc/app/config"
+	"github.com/gruzdev-dev/meddoc/app/database"
+	"github.com/gruzdev-dev/meddoc/app/database/repositories"
 	"github.com/gruzdev-dev/meddoc/app/handlers"
-	"github.com/gruzdev-dev/meddoc/app/repositories"
 	"github.com/gruzdev-dev/meddoc/app/server"
 	"github.com/gruzdev-dev/meddoc/app/services/document"
 	"github.com/gruzdev-dev/meddoc/app/services/user"
-	"github.com/gruzdev-dev/meddoc/database"
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
 )
 

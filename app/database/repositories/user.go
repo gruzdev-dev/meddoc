@@ -40,7 +40,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	err := r.collection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&existingUser)
 	if err == nil {
 		return ErrUserExists
-	} else if err != mongo.ErrNoDocuments {
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
 		return err
 	}
 
@@ -64,7 +64,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	var mongoUser mongoUser
 	err := r.collection.FindOne(ctx, bson.M{"email": email}).Decode(&mongoUser)
-	if err == mongo.ErrNoDocuments {
+	if errors.Is(err, mongo.ErrNoDocuments) {
 		return nil, ErrUserNotFound
 	}
 	if err != nil {
