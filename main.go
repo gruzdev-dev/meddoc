@@ -9,11 +9,13 @@ import (
 	"github.com/gruzdev-dev/meddoc/app/handlers"
 	"github.com/gruzdev-dev/meddoc/app/server"
 	"github.com/gruzdev-dev/meddoc/app/services/document"
+	"github.com/gruzdev-dev/meddoc/app/services/file"
 	"github.com/gruzdev-dev/meddoc/app/services/user"
 	"github.com/gruzdev-dev/meddoc/config"
 	"github.com/gruzdev-dev/meddoc/database"
 	"github.com/gruzdev-dev/meddoc/database/repositories"
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
+	"github.com/gruzdev-dev/meddoc/pkg/storage"
 )
 
 func main() {
@@ -52,7 +54,17 @@ func main() {
 	documentRepo := repositories.NewDocumentRepository(mongoDB.Database().Collection("documents"))
 	documentService := document.NewService(documentRepo)
 
-	handlers := handlers.NewHandlers(userService, documentService)
+	fileRepo, err := repositories.NewFileRepository(mongoDB.Database().Collection("files"))
+	if err != nil {
+		logger.Fatal("failed to create file repository", err)
+	}
+	localStorage, err := storage.NewLocal("storage/files")
+	if err != nil {
+		logger.Fatal("failed to create local storage", err)
+	}
+	fileService := file.NewService(fileRepo, localStorage)
+
+	handlers := handlers.NewHandlers(userService, documentService, fileService)
 
 	srv := server.NewServer(cfg, handlers)
 	if err := srv.Start(); err != nil {

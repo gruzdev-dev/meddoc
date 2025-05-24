@@ -5,6 +5,7 @@ package tests
 import (
 	"context"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -14,10 +15,12 @@ import (
 	"github.com/gruzdev-dev/meddoc/app/handlers"
 	"github.com/gruzdev-dev/meddoc/app/server/middleware"
 	"github.com/gruzdev-dev/meddoc/app/services/document"
+	"github.com/gruzdev-dev/meddoc/app/services/file"
 	"github.com/gruzdev-dev/meddoc/app/services/user"
 	"github.com/gruzdev-dev/meddoc/config"
 	"github.com/gruzdev-dev/meddoc/database"
 	"github.com/gruzdev-dev/meddoc/database/repositories"
+	"github.com/gruzdev-dev/meddoc/pkg/storage"
 )
 
 func setupTestServer(t *testing.T) (*httptest.Server, *user.UserService) {
@@ -41,12 +44,23 @@ func setupTestServer(t *testing.T) (*httptest.Server, *user.UserService) {
 	err = mongoDB.Database().Drop(ctx)
 	require.NoError(t, err)
 
+	testStorageDir := "test_storage"
+	require.NoError(t, os.MkdirAll(testStorageDir, 0755))
+	t.Cleanup(func() {
+		_ = os.RemoveAll(testStorageDir)
+	})
+
 	userRepo := repositories.NewUserRepository(mongoDB.Database().Collection("users"))
 	userService := user.NewUserServiceFromConfig(userRepo, cfg)
+	fileRepo, err := repositories.NewFileRepository(mongoDB.Database().Collection("files"))
+	require.NoError(t, err)
+	localStorage, err := storage.NewLocal(testStorageDir)
+	require.NoError(t, err)
 	documentRepo := repositories.NewDocumentRepository(mongoDB.Database().Collection("documents"))
 	documentService := document.NewService(documentRepo)
+	fileService := file.NewService(fileRepo, localStorage)
 
-	handlers := handlers.NewHandlers(userService, documentService)
+	handlers := handlers.NewHandlers(userService, documentService, fileService)
 	router := mux.NewRouter()
 	router.Use(middleware.RequestID())
 	router.Use(middleware.Logging())
