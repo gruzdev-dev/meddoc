@@ -23,19 +23,6 @@ const (
 	largeFileSize = 2 << 20 // 2MB
 )
 
-type mockStorage struct {
-	uploadFunc   func(ctx context.Context, filename string, reader io.Reader) (string, error)
-	downloadFunc func(ctx context.Context, fileID string) (io.ReadCloser, error)
-}
-
-func (m *mockStorage) Upload(ctx context.Context, filename string, reader io.Reader) (string, error) {
-	return m.uploadFunc(ctx, filename, reader)
-}
-
-func (m *mockStorage) Download(ctx context.Context, fileID string) (io.ReadCloser, error) {
-	return m.downloadFunc(ctx, fileID)
-}
-
 type fakeMultipartFile struct {
 	*bytes.Reader
 }
