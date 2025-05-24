@@ -74,6 +74,23 @@ paths:
           description: Invalid input
 
   /documents:
+    get:
+      summary: Get all user documents
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of user documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Internal server error
     post:
       summary: Create a new document
       security:
@@ -93,25 +110,6 @@ paths:
                 $ref: '#/components/schemas/Document'
         '400':
           description: Invalid input
-        '401':
-          description: Unauthorized
-        '500':
-          description: Internal server error
-
-  /documents/user:
-    get:
-      summary: Get all user documents
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of user documents
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Document'
         '401':
           description: Unauthorized
         '500':
@@ -305,6 +303,7 @@ components:
           format: date-time
       required:
         - email
+        
     UserRegistration:
       type: object
       properties:
@@ -319,6 +318,7 @@ components:
       required:
         - email
         - password
+
     UserLogin:
       type: object
       properties:
@@ -330,6 +330,7 @@ components:
       required:
         - email
         - password
+
     TokenPair:
       type: object
       properties:
@@ -344,6 +345,7 @@ components:
         - access_token
         - refresh_token
         - expires_in
+
     RefreshToken:
       type: object
       properties:
