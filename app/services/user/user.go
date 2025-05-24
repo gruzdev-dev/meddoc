@@ -129,3 +129,16 @@ func (s *UserService) generateTokenPair(user *models.User) (*models.TokenPair, e
 		ExpiresIn:    int(s.accessTokenTTL.Seconds()),
 	}, nil
 }
+
+func (s *UserService) ValidateToken(tokenString string) (string, error) {
+	claims := &jwt.RegisteredClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+		return s.jwtSecret, nil
+	})
+
+	if err != nil || !token.Valid {
+		return "", errors.New("invalid token")
+	}
+
+	return claims.Subject, nil
+}

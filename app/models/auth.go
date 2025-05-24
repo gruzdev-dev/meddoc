@@ -6,9 +6,9 @@ import (
 
 type User struct {
 	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	Password  string    `json:"-"`
+	Email     string    `json:"email" binding:"required,email"`
+	Name      string    `json:"name" binding:"required"`
+	Password  string    `json:"-" binding:"required,min=8"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

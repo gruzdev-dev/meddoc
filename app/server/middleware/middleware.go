@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	appctx "github.com/gruzdev-dev/meddoc/app/server/context"
+	"github.com/gruzdev-dev/meddoc/app/services/user"
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
 )
 
@@ -133,4 +135,30 @@ func generateRequestID() string {
 	b := make([]byte, requestIDLength)
 	rand.Read(b)
 	return base64.URLEncoding.EncodeToString(b)
+}
+
+func Auth(userService *user.UserService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+			if tokenString == authHeader {
+				http.Error(w, "invalid token format", http.StatusUnauthorized)
+				return
+			}
+
+			userID, err := userService.ValidateToken(tokenString)
+			if err != nil {
+				http.Error(w, "invalid token", http.StatusUnauthorized)
+				return
+			}
+
+			next.ServeHTTP(w, appctx.WithUserID(r, userID))
+		})
+	}
 }

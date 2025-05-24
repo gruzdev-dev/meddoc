@@ -1,0 +1,81 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/gorilla/mux"
+	"github.com/gruzdev-dev/meddoc/app/models"
+	"github.com/gruzdev-dev/meddoc/app/server/context"
+	"github.com/gruzdev-dev/meddoc/app/server/middleware"
+	"github.com/gruzdev-dev/meddoc/app/services/document"
+	"github.com/gruzdev-dev/meddoc/app/services/user"
+)
+
+type DocumentHandler struct {
+	documentService *document.Service
+	userService     *user.UserService
+}
+
+func NewDocumentHandler(documentService *document.Service, userService *user.UserService) *DocumentHandler {
+	return &DocumentHandler{
+		documentService: documentService,
+		userService:     userService,
+	}
+}
+
+func (h *DocumentHandler) CreateDocument(w http.ResponseWriter, r *http.Request) {
+	var doc models.DocumentCreation
+	if err := json.NewDecoder(r.Body).Decode(&doc); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	doc.UserID = context.GetUserID(r)
+	if err := h.documentService.CreateDocument(r.Context(), doc); err != nil {
+		http.Error(w, "failed to create document", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *DocumentHandler) GetDocument(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	userID := context.GetUserID(r)
+
+	doc, err := h.documentService.GetDocument(r.Context(), id, userID)
+	if err != nil {
+		if err == document.ErrAccessDenied {
+			http.Error(w, "access denied", http.StatusForbidden)
+			return
+		}
+		http.Error(w, "document not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(doc)
+}
+
+func (h *DocumentHandler) GetUserDocuments(w http.ResponseWriter, r *http.Request) {
+	userID := context.GetUserID(r)
+	docs, err := h.documentService.GetUserDocuments(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "failed to get documents", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(docs)
+}
+
+func (h *DocumentHandler) RegisterRoutes(router *mux.Router) {
+	docs := router.PathPrefix("/documents").Subrouter()
+	docs.Use(middleware.Auth(h.userService))
+
+	docs.HandleFunc("", h.CreateDocument).Methods(http.MethodPost)
+	docs.HandleFunc("/{id}", h.GetDocument).Methods(http.MethodGet)
+	docs.HandleFunc("/user", h.GetUserDocuments).Methods(http.MethodGet)
+}
