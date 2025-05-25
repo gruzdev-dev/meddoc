@@ -287,9 +287,6 @@ components:
           type: object
           additionalProperties:
             type: string
-        user_id:
-          type: string
-          format: uuid
         created_at:
           type: string
           format: date-time
@@ -298,7 +295,6 @@ components:
           format: date-time
       required:
         - title
-        - user_id
 
     DocumentCreation:
       type: object
@@ -328,17 +324,23 @@ components:
       properties:
         title:
           type: string
+          nullable: true
         description:
           type: string
+          nullable: true
         date:
           type: string
           format: date
+          nullable: true
         file:
           type: string
+          nullable: true
         category:
           type: string
+          nullable: true
         priority:
           type: integer
+          nullable: true
         content:
           type: object
           additionalProperties:
