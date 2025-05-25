@@ -144,12 +144,19 @@ func (s *Service) DownloadFile(ctx context.Context, id string, userID string) (i
 		return nil, apperrors.ErrAccessDenied
 	}
 
+	var reader io.ReadCloser
 	switch file.StorageType {
 	case "gridfs":
-		return s.repo.DownloadFile(ctx, gridFSID)
+		reader, err = s.repo.DownloadFile(ctx, gridFSID)
 	case "local":
-		return s.localStorage.Download(ctx, id)
+		reader, err = s.localStorage.Download(ctx, id)
 	default:
 		return nil, fmt.Errorf("unknown storage type: %s", file.StorageType)
 	}
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to download file: %w", err)
+	}
+
+	return reader, nil
 }

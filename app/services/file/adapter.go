@@ -18,3 +18,7 @@ func (a *FileHeaderAdapter) GetHeader() map[string][]string {
 func (a *FileHeaderAdapter) GetSize() int64 {
 	return a.Size
 }
+
+func (a *FileHeaderAdapter) Open() (multipart.File, error) {
+	return a.FileHeader.Open()
+}

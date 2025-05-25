@@ -22,8 +22,7 @@ func NewLocal(basePath string) (*Local, error) {
 }
 
 func (s *Local) Upload(ctx context.Context, filename string, reader io.Reader) (string, error) {
-	fileID := filename
-	filePath := filepath.Join(s.basePath, fileID)
+	filePath := filepath.Join(s.basePath, filename)
 
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -42,10 +41,14 @@ func (s *Local) Upload(ctx context.Context, filename string, reader io.Reader) (
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}
 
-	return fileID, nil
+	return filename, nil
 }
 
 func (s *Local) Download(ctx context.Context, fileID string) (io.ReadCloser, error) {
 	filePath := filepath.Join(s.basePath, fileID)
-	return os.Open(filePath)
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file: %w", err)
+	}
+	return file, nil
 }

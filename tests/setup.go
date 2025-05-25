@@ -47,6 +47,8 @@ func setupTestServer(t *testing.T) (*httptest.Server, *user.UserService) {
 	testStorageDir := "test_storage"
 	require.NoError(t, os.MkdirAll(testStorageDir, 0755))
 	t.Cleanup(func() {
+		// Wait for all file operations to complete
+		time.Sleep(100 * time.Millisecond)
 		_ = os.RemoveAll(testStorageDir)
 	})
 

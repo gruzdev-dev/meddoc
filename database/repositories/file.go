@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
 
+	"github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
 )
@@ -35,6 +36,7 @@ func (r *FileRepository) Create(ctx context.Context, file *models.File) error {
 	mongoFile := bson.M{
 		"user_id":      file.UserID,
 		"download_url": file.DownloadURL,
+		"storage_type": file.StorageType,
 	}
 
 	result, err := r.collection.InsertOne(ctx, mongoFile)
@@ -58,10 +60,16 @@ func (r *FileRepository) GetByID(ctx context.Context, id string) (*models.File, 
 		return nil, err
 	}
 
+	storageType, ok := mongoFile["storage_type"].(string)
+	if !ok {
+		storageType = ""
+	}
+
 	return &models.File{
 		ID:          mongoFile["_id"].(primitive.ObjectID).Hex(),
 		UserID:      mongoFile["user_id"].(string),
 		DownloadURL: mongoFile["download_url"].(string),
+		StorageType: storageType,
 	}, nil
 }
 
@@ -86,8 +94,16 @@ func (r *FileRepository) UploadFile(ctx context.Context, filename string, reader
 func (r *FileRepository) DownloadFile(ctx context.Context, fileID string) (io.ReadCloser, error) {
 	objectID, err := primitive.ObjectIDFromHex(fileID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid file ID: %w", err)
 	}
 
-	return r.bucket.OpenDownloadStream(objectID)
+	stream, err := r.bucket.OpenDownloadStream(objectID)
+	if err != nil {
+		if err == gridfs.ErrFileNotFound {
+			return nil, errors.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to open download stream: %w", err)
+	}
+
+	return stream, nil
 }

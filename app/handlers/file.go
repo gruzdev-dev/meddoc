@@ -54,7 +54,12 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	mimeType := header.Header.Get("Content-Type")
+	mimeType := r.Header.Get("X-File-Type")
+	if mimeType == "" {
+		http.Error(w, "content type is missing", http.StatusBadRequest)
+		return
+	}
+
 	if !allowedMimeTypes[mimeType] {
 		http.Error(w, "file type not allowed", http.StatusBadRequest)
 		return
