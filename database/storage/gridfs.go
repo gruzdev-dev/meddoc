@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
 
@@ -29,7 +30,12 @@ func NewGridFSStorage(db *mongo.Database) (*GridFSStorage, error) {
 }
 
 func (s *GridFSStorage) Upload(ctx context.Context, id string, reader io.Reader) error {
-	uploadStream, err := s.bucket.OpenUploadStream(id)
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return fmt.Errorf("invalid file ID: %w", err)
+	}
+
+	uploadStream, err := s.bucket.OpenUploadStreamWithID(objectID, id)
 	if err != nil {
 		return fmt.Errorf("failed to open upload stream: %w", err)
 	}
@@ -47,7 +53,12 @@ func (s *GridFSStorage) Upload(ctx context.Context, id string, reader io.Reader)
 }
 
 func (s *GridFSStorage) Download(ctx context.Context, id string) (io.ReadCloser, error) {
-	stream, err := s.bucket.OpenDownloadStream(id)
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid file ID: %w", err)
+	}
+
+	stream, err := s.bucket.OpenDownloadStream(objectID)
 	if err != nil {
 		if errors.Is(err, gridfs.ErrFileNotFound) {
 			return nil, apperrors.ErrNotFound
