@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/gorilla/mux"
 
 	"github.com/gruzdev-dev/meddoc/app/errors"
+	"github.com/gruzdev-dev/meddoc/app/models"
 	"github.com/gruzdev-dev/meddoc/app/server/context"
 	"github.com/gruzdev-dev/meddoc/app/server/middleware"
 	"github.com/gruzdev-dev/meddoc/app/services/file"
@@ -15,11 +19,18 @@ import (
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
 )
 
-var allowedMimeTypes = map[string]bool{
-	"application/pdf": true,
-	"image/jpeg":      true,
-	"image/jpg":       true,
-	"image/png":       true,
+var allowedMimeTypes = map[string]struct{}{
+	"application/pdf": {},
+	"image/jpeg":      {},
+	"image/jpg":       {},
+	"image/png":       {},
+}
+
+var allowedExts = map[string]struct{}{
+	".pdf":  {},
+	".jpg":  {},
+	".jpeg": {},
+	".png":  {},
 }
 
 type FileHandler struct {
@@ -54,25 +65,35 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	mimeType := r.Header.Get("X-File-Type")
-	if mimeType == "" {
-		http.Error(w, "content type is missing", http.StatusBadRequest)
+	buffer := make([]byte, 512)
+	n, err := fileReader.Read(buffer)
+	if err != nil && err != io.EOF {
+		http.Error(w, "error reading file", http.StatusBadRequest)
+		return
+	}
+	buffer = buffer[:n]
+
+	mimeType := header.Header.Get("Content-Type")
+	detectedType := http.DetectContentType(buffer)
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+
+	if !isValidMimeType(mimeType) || !isValidExtension(ext) || !isValidMimeType(detectedType) {
+		http.Error(w, "invalid file type", http.StatusBadRequest)
 		return
 	}
 
-	if !allowedMimeTypes[mimeType] {
-		http.Error(w, "file type not allowed", http.StatusBadRequest)
-		return
-	}
+	multiReader := io.MultiReader(bytes.NewReader(buffer), fileReader)
 
 	userID := context.GetUserID(r)
-	logger.Info("uploading file", map[string]interface{}{
-		"filename":  header.Filename,
-		"mime_type": mimeType,
-		"user_id":   userID,
+	logger.Info("uploading file", map[string]any{
+		"user_id": userID,
 	})
 
-	uploadedFile, err := h.fileService.UploadFile(r.Context(), &file.FileHeaderAdapter{FileHeader: header}, userID)
+	metadata := models.FileMetadata{
+		Size: header.Size,
+	}
+
+	uploadedFile, err := h.fileService.UploadFile(r.Context(), multiReader, metadata, userID)
 	if err != nil {
 		logger.Error("failed to upload file", err)
 		http.Error(w, "failed to upload file", http.StatusInternalServerError)
@@ -86,6 +107,16 @@ func (h *FileHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to encode response", http.StatusInternalServerError)
 		return
 	}
+}
+
+func isValidMimeType(mimeType string) bool {
+	_, exists := allowedMimeTypes[mimeType]
+	return exists
+}
+
+func isValidExtension(ext string) bool {
+	_, exists := allowedExts[ext]
+	return exists
 }
 
 func (h *FileHandler) DownloadFile(w http.ResponseWriter, r *http.Request) {

@@ -9,7 +9,6 @@ servers:
     description: API v1
 
 paths:
-
   /auth/register:
     post:
       summary: Register a new user
@@ -76,6 +75,7 @@ paths:
   /documents:
     get:
       summary: Get all user documents
+      description: Returns a list of all documents belonging to the authenticated user
       security:
         - BearerAuth: []
       responses:
@@ -91,8 +91,17 @@ paths:
           description: Unauthorized
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
     post:
       summary: Create a new document
+      description: Creates a new document for the authenticated user
       security:
         - BearerAuth: []
       requestBody:
@@ -114,10 +123,19 @@ paths:
           description: Unauthorized
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
 
   /documents/{id}:
     get:
       summary: Get document by ID
+      description: Returns a document by its ID. The document must belong to the authenticated user.
       security:
         - BearerAuth: []
       parameters:
@@ -126,6 +144,8 @@ paths:
           required: true
           schema:
             type: string
+            description: Document ID
+          example: "507f1f77bcf86cd799439011"
       responses:
         '200':
           description: Document details
@@ -136,13 +156,22 @@ paths:
         '401':
           description: Unauthorized
         '403':
-          description: Access denied
+          description: Access denied (trying to access another user's document)
         '404':
           description: Document not found
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
     patch:
       summary: Update document by ID
+      description: Updates a document by its ID. The document must belong to the authenticated user.
       security:
         - BearerAuth: []
       parameters:
@@ -151,6 +180,8 @@ paths:
           required: true
           schema:
             type: string
+            description: Document ID
+          example: "507f1f77bcf86cd799439011"
       requestBody:
         required: true
         content:
@@ -169,13 +200,22 @@ paths:
         '401':
           description: Unauthorized
         '403':
-          description: Access denied
+          description: Access denied (trying to access another user's document)
         '404':
           description: Document not found
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
     delete:
       summary: Delete document by ID
+      description: Deletes a document by its ID. The document must belong to the authenticated user.
       security:
         - BearerAuth: []
       parameters:
@@ -184,21 +224,35 @@ paths:
           required: true
           schema:
             type: string
+            description: Document ID
+          example: "507f1f77bcf86cd799439011"
       responses:
         '204':
           description: Document deleted successfully
         '401':
           description: Unauthorized
         '403':
-          description: Access denied
+          description: Access denied (trying to access another user's document)
         '404':
           description: Document not found
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
 
   /files/upload:
     post:
       summary: Upload a file
+      description: |
+        Upload a file to the system. Files smaller than 1MB are stored locally,
+        larger files are stored in GridFS. Returns a file ID that can be used to download the file.
+        Allowed file types: PDF, JPEG, JPG, PNG. Maximum file size: 100MB.
       security:
         - BearerAuth: []
       requestBody:
@@ -211,6 +265,20 @@ paths:
                 file:
                   type: string
                   format: binary
+                  description: File to upload (max size 100MB)
+                metadata:
+                  type: object
+                  description: Optional file metadata
+                  properties:
+                    name:
+                      type: string
+                      description: Original filename
+                    type:
+                      type: string
+                      description: MIME type of the file
+                    size:
+                      type: integer
+                      description: File size in bytes
       responses:
         '201':
           description: File uploaded successfully
@@ -219,20 +287,44 @@ paths:
               schema:
                 type: object
                 properties:
-                  file_id:
+                  id:
                     type: string
+                    description: Unique identifier of the uploaded file
                 required:
-                  - file_id
+                  - id
         '400':
           description: Invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    enum: 
+                      - file too large
+                      - invalid file type
+                      - missing file
+                      - invalid metadata
         '401':
           description: Unauthorized
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
 
   /files/{id}:
     get:
       summary: Download a file
+      description: |
+        Download a file by its ID. The file must belong to the authenticated user.
+        Returns the file content with appropriate Content-Type and Content-Disposition headers.
       security:
         - BearerAuth: []
       parameters:
@@ -241,6 +333,8 @@ paths:
           required: true
           schema:
             type: string
+            description: File ID
+          example: "507f1f77bcf86cd799439011"
       responses:
         '200':
           description: File content
@@ -249,12 +343,37 @@ paths:
               schema:
                 type: string
                 format: binary
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum: [application/pdf, image/jpeg, image/jpg, image/png, application/octet-stream]
+              description: MIME type of the file
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="document.pdf"
+              description: Filename for download
+            Content-Length:
+              schema:
+                type: integer
+              description: Size of the file in bytes
         '401':
           description: Unauthorized
+        '403':
+          description: Access denied (trying to access another user's file)
         '404':
           description: File not found
         '500':
           description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    description: Error message
 
 components:
   securitySchemes:

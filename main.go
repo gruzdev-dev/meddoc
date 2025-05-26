@@ -14,8 +14,9 @@ import (
 	"github.com/gruzdev-dev/meddoc/config"
 	"github.com/gruzdev-dev/meddoc/database"
 	"github.com/gruzdev-dev/meddoc/database/repositories"
+	dbstorage "github.com/gruzdev-dev/meddoc/database/storage"
 	"github.com/gruzdev-dev/meddoc/pkg/logger"
-	"github.com/gruzdev-dev/meddoc/pkg/storage"
+	localstorage "github.com/gruzdev-dev/meddoc/pkg/storage"
 )
 
 func main() {
@@ -54,15 +55,19 @@ func main() {
 	documentRepo := repositories.NewDocumentRepository(mongoDB.Database().Collection("documents"))
 	documentService := document.NewService(documentRepo)
 
-	fileRepo, err := repositories.NewFileRepository(mongoDB.Database().Collection("files"))
-	if err != nil {
-		logger.Fatal("failed to create file repository", err)
-	}
-	localStorage, err := storage.NewLocal("storage/files")
+	fileRepo := repositories.NewFileRepository(mongoDB.Database().Collection("files"))
+
+	localStorage, err := localstorage.NewLocal("storage/files")
 	if err != nil {
 		logger.Fatal("failed to create local storage", err)
 	}
-	fileService := file.NewService(fileRepo, localStorage)
+
+	gridStorage, err := dbstorage.NewGridFSStorage(mongoDB.Database())
+	if err != nil {
+		logger.Fatal("failed to create grid storage", err)
+	}
+
+	fileService := file.NewService(fileRepo, localStorage, gridStorage)
 
 	handlers := handlers.NewHandlers(userService, documentService, fileService)
 

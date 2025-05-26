@@ -1,8 +1,20 @@
 package models
 
-type File struct {
-	ID          string `json:"id" binding:"required"`
-	UserID      string `json:"-" binding:"required"`
-	DownloadURL string `json:"download_url" binding:"required"`
-	StorageType string `json:"-" binding:"required"` // "gridfs" or "local"
+type FileRecord struct {
+	ID          string
+	UserID      string
+	StorageType string // "gridfs" or "local"
+}
+
+type FileResponse struct {
+	ID string `json:"id"`
+}
+
+type FileMetadata struct {
+	Size int64 `json:"size"`
+}
+
+type FileCreation struct {
+	UserID      string
+	StorageType string // "gridfs" or "local"
 }

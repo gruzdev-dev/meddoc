@@ -20,7 +20,8 @@ import (
 	"github.com/gruzdev-dev/meddoc/config"
 	"github.com/gruzdev-dev/meddoc/database"
 	"github.com/gruzdev-dev/meddoc/database/repositories"
-	"github.com/gruzdev-dev/meddoc/pkg/storage"
+	dbstorage "github.com/gruzdev-dev/meddoc/database/storage"
+	localstorage "github.com/gruzdev-dev/meddoc/pkg/storage"
 )
 
 func setupTestServer(t *testing.T) (*httptest.Server, *user.UserService) {
@@ -54,13 +55,18 @@ func setupTestServer(t *testing.T) (*httptest.Server, *user.UserService) {
 
 	userRepo := repositories.NewUserRepository(mongoDB.Database().Collection("users"))
 	userService := user.NewUserServiceFromConfig(userRepo, cfg)
-	fileRepo, err := repositories.NewFileRepository(mongoDB.Database().Collection("files"))
+
+	fileRepo := repositories.NewFileRepository(mongoDB.Database().Collection("files"))
+
+	localStorage, err := localstorage.NewLocal(testStorageDir)
 	require.NoError(t, err)
-	localStorage, err := storage.NewLocal(testStorageDir)
+
+	gridStorage, err := dbstorage.NewGridFSStorage(mongoDB.Database())
 	require.NoError(t, err)
+
 	documentRepo := repositories.NewDocumentRepository(mongoDB.Database().Collection("documents"))
 	documentService := document.NewService(documentRepo)
-	fileService := file.NewService(fileRepo, localStorage)
+	fileService := file.NewService(fileRepo, localStorage, gridStorage)
 
 	handlers := handlers.NewHandlers(userService, documentService, fileService)
 	router := mux.NewRouter()

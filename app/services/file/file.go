@@ -2,17 +2,13 @@ package file
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
-	stderrors "errors"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 
 	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
-	"github.com/gruzdev-dev/meddoc/pkg/logger"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
@@ -22,108 +18,47 @@ const (
 type Service struct {
 	repo         FileRepository
 	localStorage Storage
+	gridStorage  Storage
 }
 
-func NewService(repo FileRepository, localStorage Storage) *Service {
+func NewService(repo FileRepository, localStorage, gridStorage Storage) *Service {
 	return &Service{
 		repo:         repo,
 		localStorage: localStorage,
+		gridStorage:  gridStorage,
 	}
 }
 
-var generateRandomName = func() (string, error) {
-	bytes := make([]byte, 16)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(bytes), nil
-}
-
-func determineFileExtension(filename, contentType string) string {
-	if ext := filepath.Ext(filename); ext != "" {
-		return ext
-	}
-
-	switch contentType {
-	case "application/pdf":
-		return ".pdf"
-	case "image/jpeg", "image/jpg":
-		return ".jpg"
-	case "image/png":
-		return ".png"
-	default:
-		return ""
-	}
-}
-
-func (s *Service) uploadSmallFile(ctx context.Context, generatedName, ext string, src io.Reader) (string, error) {
-	fileID := generatedName + ext
-	_, err := s.localStorage.Upload(ctx, fileID, src)
-	return fileID, err
-}
-
-func (s *Service) uploadLargeFile(generatedName, ext string, src io.Reader) (string, error) {
-	fileID, err := s.repo.UploadFile(context.Background(), generatedName, src)
-	if err != nil {
-		return "", fmt.Errorf("failed to upload file: %w", err)
-	}
-	return fileID + ext, nil
-}
-
-func (s *Service) UploadFile(ctx context.Context, file FileOpener, userID string) (*models.File, error) {
-	generatedName, err := generateRandomName()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate random name: %w", err)
-	}
-
-	filename := file.GetFilename()
-	header := file.GetHeader()
-	contentTypes, ok := header["Content-Type"]
-	if filename == "" {
-		return nil, fmt.Errorf("filename is empty")
-	}
-	if !ok || len(contentTypes) == 0 || contentTypes[0] == "" {
-		return nil, fmt.Errorf("content type is missing")
-	}
-
-	ext := determineFileExtension(filename, contentTypes[0])
-
-	src, err := file.Open()
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer func() {
-		if err := src.Close(); err != nil {
-			logger.Error("failed to close source file", err)
-		}
-	}()
-
-	var fileID string
-	var storageType string
-	if file.GetSize() < smallFileThreshold {
-		fileID, err = s.uploadSmallFile(ctx, generatedName, ext, src)
-		storageType = "local"
-	} else {
-		fileID, err = s.uploadLargeFile(generatedName, ext, src)
+func (s *Service) UploadFile(ctx context.Context, reader io.Reader, metadata models.FileMetadata, userID string) (*models.FileResponse, error) {
+	storageType := "local"
+	if metadata.Size >= smallFileThreshold {
 		storageType = "gridfs"
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to upload file: %w", err)
-	}
-
-	newFile := &models.File{
-		ID:          fileID,
+	fileCreation := &models.FileCreation{
 		UserID:      userID,
-		DownloadURL: fmt.Sprintf("/files/%s", fileID),
 		StorageType: storageType,
 	}
 
-	if err := s.repo.Create(ctx, newFile); err != nil {
+	fileRecord, err := s.repo.Create(ctx, fileCreation)
+	if err != nil {
 		return nil, fmt.Errorf("failed to create file record: %w", err)
 	}
 
-	return newFile, nil
+	var err2 error
+	if storageType == "local" {
+		err2 = s.localStorage.Upload(ctx, fileRecord.ID, reader)
+	} else {
+		err2 = s.gridStorage.Upload(ctx, fileRecord.ID, reader)
+	}
+
+	if err2 != nil {
+		return nil, fmt.Errorf("failed to upload file: %w", err2)
+	}
+
+	return &models.FileResponse{
+		ID: fileRecord.ID,
+	}, nil
 }
 
 func (s *Service) DownloadFile(ctx context.Context, id string, userID string) (io.ReadCloser, error) {
@@ -134,7 +69,7 @@ func (s *Service) DownloadFile(ctx context.Context, id string, userID string) (i
 
 	file, err := s.repo.GetByID(ctx, gridFSID)
 	if err != nil {
-		if stderrors.Is(err, mongo.ErrNoDocuments) {
+		if errors.Is(err, apperrors.ErrNotFound) {
 			return nil, apperrors.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get file: %w", err)
@@ -147,7 +82,7 @@ func (s *Service) DownloadFile(ctx context.Context, id string, userID string) (i
 	var reader io.ReadCloser
 	switch file.StorageType {
 	case "gridfs":
-		reader, err = s.repo.DownloadFile(ctx, gridFSID)
+		reader, err = s.gridStorage.Download(ctx, id)
 	case "local":
 		reader, err = s.localStorage.Download(ctx, id)
 	default:

@@ -1,210 +1,126 @@
 package file
 
 import (
-	"bytes"
 	"context"
-	stderrors "errors"
-	"fmt"
+	"errors"
 	"io"
-	"mime/multipart"
+	"strings"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/stretchr/testify/assert"
-
+	apperrors "github.com/gruzdev-dev/meddoc/app/errors"
 	"github.com/gruzdev-dev/meddoc/app/models"
+	"github.com/stretchr/testify/assert"
 )
-
-const (
-	testUserID    = "user123"
-	testFileID    = "test-file-id.jpg"
-	testContent   = "test content"
-	largeFileSize = 2 << 20 // 2MB
-)
-
-type fakeMultipartFile struct {
-	*bytes.Reader
-}
-
-func (f *fakeMultipartFile) Close() error {
-	return nil
-}
-
-func (f *fakeMultipartFile) ReadAt(p []byte, off int64) (n int, err error) {
-	return f.Reader.ReadAt(p, off)
-}
-
-type testFile struct {
-	content   []byte
-	header    map[string][]string
-	openError error
-}
-
-func (f *testFile) Open() (multipart.File, error) {
-	if f.openError != nil {
-		return nil, f.openError
-	}
-	return &fakeMultipartFile{bytes.NewReader(f.content)}, nil
-}
-
-func (f *testFile) GetFilename() string {
-	return "test.jpg"
-}
-
-func (f *testFile) GetHeader() map[string][]string {
-	return f.header
-}
-
-func (f *testFile) GetSize() int64 {
-	return int64(len(f.content))
-}
-
-func createTestFile(content []byte) FileOpener {
-	return &testFile{
-		content: content,
-		header: map[string][]string{
-			"Content-Type": {"image/jpeg"},
-		},
-	}
-}
-
-func setupSuccessfulUploadMocks(mockStorage *MockStorage, mockRepo *MockFileRepository, fileID string, userID string, storageType string) {
-	if storageType == "local" {
-		mockStorage.EXPECT().
-			Upload(gomock.Any(), fileID, gomock.Any()).
-			Return(fileID, nil)
-	} else {
-		mockRepo.EXPECT().
-			UploadFile(gomock.Any(), fileID[:len(fileID)-4], gomock.Any()).
-			Return(fileID[:len(fileID)-4], nil)
-	}
-
-	mockRepo.EXPECT().
-		Create(gomock.Any(), &models.File{
-			ID:          fileID,
-			UserID:      userID,
-			DownloadURL: fmt.Sprintf("/files/%s", fileID),
-			StorageType: storageType,
-		}).
-		Return(nil)
-}
 
 func TestService_UploadFile(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockRepo := NewMockFileRepository(ctrl)
-	mockStorage := NewMockStorage(ctrl)
-	service := NewService(mockRepo, mockStorage)
+	mockLocalStorage := NewMockStorage(ctrl)
+	mockGridStorage := NewMockStorage(ctrl)
 
-	originalGenerateRandomName := generateRandomName
-	defer func() { generateRandomName = originalGenerateRandomName }()
-	generateRandomName = func() (string, error) {
-		return "test-file-id", nil
-	}
+	service := NewService(mockRepo, mockLocalStorage, mockGridStorage)
 
 	tests := []struct {
-		name          string
-		file          FileOpener
-		userID        string
-		setupMocks    func()
-		expectedFile  *models.File
-		expectedError string
+		name           string
+		fileSize       int64
+		expectedError  error
+		setupMocks     func()
+		expectedResult *models.FileResponse
 	}{
 		{
-			name:   "successful_small_file_upload",
-			file:   createTestFile([]byte(testContent)),
-			userID: testUserID,
+			name:     "successful small file upload",
+			fileSize: 500 * 1024, // 500KB
 			setupMocks: func() {
-				setupSuccessfulUploadMocks(mockStorage, mockRepo, testFileID, testUserID, "local")
-			},
-			expectedFile: &models.File{
-				ID:          testFileID,
-				UserID:      testUserID,
-				DownloadURL: fmt.Sprintf("/files/%s", testFileID),
-				StorageType: "local",
-			},
-		},
-		{
-			name:   "successful_large_file_upload",
-			file:   createTestFile(make([]byte, largeFileSize)),
-			userID: testUserID,
-			setupMocks: func() {
-				setupSuccessfulUploadMocks(mockStorage, mockRepo, testFileID, testUserID, "gridfs")
-			},
-			expectedFile: &models.File{
-				ID:          testFileID,
-				UserID:      testUserID,
-				DownloadURL: fmt.Sprintf("/files/%s", testFileID),
-				StorageType: "gridfs",
-			},
-		},
-		{
-			name:   "repository_error",
-			file:   createTestFile([]byte(testContent)),
-			userID: testUserID,
-			setupMocks: func() {
-				mockStorage.EXPECT().
-					Upload(gomock.Any(), testFileID, gomock.Any()).
-					Return(testFileID, nil)
-				mockRepo.EXPECT().
-					Create(gomock.Any(), gomock.Any()).
-					Return(stderrors.New("database error"))
-			},
-			expectedError: "database error",
-		},
-		{
-			name:   "upload_error",
-			file:   createTestFile([]byte(testContent)),
-			userID: testUserID,
-			setupMocks: func() {
-				mockStorage.EXPECT().
-					Upload(gomock.Any(), testFileID, gomock.Any()).
-					Return("", stderrors.New("upload failed"))
-			},
-			expectedError: "upload failed",
-		},
-		{
-			name: "file_open_error",
-			file: &testFile{
-				openError: stderrors.New("open failed"),
-				header: map[string][]string{
-					"Content-Type": {"image/jpeg"},
-				},
-			},
-			userID:        testUserID,
-			expectedError: "open failed",
-		},
-		{
-			name:   "name_generation_error",
-			file:   createTestFile([]byte(testContent)),
-			userID: testUserID,
-			setupMocks: func() {
-				generateRandomName = func() (string, error) {
-					return "", stderrors.New("generation failed")
+				fileCreation := &models.FileCreation{
+					UserID:      "user123",
+					StorageType: "local",
 				}
+				fileRecord := &models.FileRecord{
+					ID:          "file123",
+					UserID:      "user123",
+					StorageType: "local",
+				}
+				mockRepo.EXPECT().Create(gomock.Any(), fileCreation).Return(fileRecord, nil)
+				mockLocalStorage.EXPECT().Upload(gomock.Any(), "file123", gomock.Any()).Return(nil)
 			},
-			expectedError: "generation failed",
+			expectedResult: &models.FileResponse{
+				ID: "file123",
+			},
+		},
+		{
+			name:     "successful large file upload",
+			fileSize: 2 * 1024 * 1024, // 2MB
+			setupMocks: func() {
+				fileCreation := &models.FileCreation{
+					UserID:      "user123",
+					StorageType: "gridfs",
+				}
+				fileRecord := &models.FileRecord{
+					ID:          "file123",
+					UserID:      "user123",
+					StorageType: "gridfs",
+				}
+				mockRepo.EXPECT().Create(gomock.Any(), fileCreation).Return(fileRecord, nil)
+				mockGridStorage.EXPECT().Upload(gomock.Any(), "file123", gomock.Any()).Return(nil)
+			},
+			expectedResult: &models.FileResponse{
+				ID: "file123",
+			},
+		},
+		{
+			name:     "repository error",
+			fileSize: 500 * 1024,
+			setupMocks: func() {
+				fileCreation := &models.FileCreation{
+					UserID:      "user123",
+					StorageType: "local",
+				}
+				mockRepo.EXPECT().Create(gomock.Any(), fileCreation).Return(nil, errors.New("db error"))
+			},
+			expectedError: errors.New("failed to create file record: db error"),
+		},
+		{
+			name:     "storage error",
+			fileSize: 500 * 1024,
+			setupMocks: func() {
+				fileCreation := &models.FileCreation{
+					UserID:      "user123",
+					StorageType: "local",
+				}
+				fileRecord := &models.FileRecord{
+					ID:          "file123",
+					UserID:      "user123",
+					StorageType: "local",
+				}
+				mockRepo.EXPECT().Create(gomock.Any(), fileCreation).Return(fileRecord, nil)
+				mockLocalStorage.EXPECT().Upload(gomock.Any(), "file123", gomock.Any()).Return(errors.New("storage error"))
+			},
+			expectedError: errors.New("failed to upload file: storage error"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setupMocks != nil {
-				tt.setupMocks()
+			tt.setupMocks()
+
+			metadata := models.FileMetadata{
+				Size: tt.fileSize,
 			}
+			reader := strings.NewReader("test content")
 
-			file, err := service.UploadFile(context.Background(), tt.file, tt.userID)
+			result, err := service.UploadFile(context.Background(), reader, metadata, "user123")
 
-			if tt.expectedError != "" {
+			if tt.expectedError != nil {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-				return
+				assert.ErrorContains(t, err, tt.expectedError.Error())
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedResult, result)
 			}
-
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedFile, file)
 		})
 	}
 }
@@ -214,161 +130,114 @@ func TestService_DownloadFile(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockRepo := NewMockFileRepository(ctrl)
-	mockStorage := NewMockStorage(ctrl)
-	service := NewService(mockRepo, mockStorage)
+	mockLocalStorage := NewMockStorage(ctrl)
+	mockGridStorage := NewMockStorage(ctrl)
+
+	service := NewService(mockRepo, mockLocalStorage, mockGridStorage)
 
 	tests := []struct {
 		name          string
-		id            string
+		fileID        string
 		userID        string
+		expectedError error
 		setupMocks    func()
-		expectedError string
-		verifyContent bool
+		expectedData  string
 	}{
 		{
-			name:   "successful_local_file_download",
-			id:     testFileID,
-			userID: testUserID,
+			name:   "successful local file download",
+			fileID: "file123",
+			userID: "user123",
 			setupMocks: func() {
-				mockRepo.EXPECT().
-					GetByID(gomock.Any(), "test-file-id").
-					Return(&models.File{
-						ID:          testFileID,
-						UserID:      testUserID,
-						StorageType: "local",
-					}, nil)
-				mockStorage.EXPECT().
-					Download(gomock.Any(), testFileID).
-					Return(io.NopCloser(bytes.NewReader([]byte(testContent))), nil)
+				fileRecord := &models.FileRecord{
+					ID:          "file123",
+					UserID:      "user123",
+					StorageType: "local",
+				}
+				mockRepo.EXPECT().GetByID(gomock.Any(), "file123").Return(fileRecord, nil)
+				mockLocalStorage.EXPECT().Download(gomock.Any(), "file123").Return(io.NopCloser(strings.NewReader("test content")), nil)
 			},
-			verifyContent: true,
+			expectedData: "test content",
 		},
 		{
-			name:   "successful_gridfs_file_download",
-			id:     testFileID,
-			userID: testUserID,
+			name:   "successful gridfs file download",
+			fileID: "file123",
+			userID: "user123",
 			setupMocks: func() {
-				mockRepo.EXPECT().
-					GetByID(gomock.Any(), "test-file-id").
-					Return(&models.File{
-						ID:          testFileID,
-						UserID:      testUserID,
-						StorageType: "gridfs",
-					}, nil)
-				mockRepo.EXPECT().
-					DownloadFile(gomock.Any(), "test-file-id").
-					Return(io.NopCloser(bytes.NewReader([]byte(testContent))), nil)
+				fileRecord := &models.FileRecord{
+					ID:          "file123",
+					UserID:      "user123",
+					StorageType: "gridfs",
+				}
+				mockRepo.EXPECT().GetByID(gomock.Any(), "file123").Return(fileRecord, nil)
+				mockGridStorage.EXPECT().Download(gomock.Any(), "file123").Return(io.NopCloser(strings.NewReader("test content")), nil)
 			},
-			verifyContent: true,
+			expectedData: "test content",
 		},
 		{
-			name:   "file_not_found",
-			id:     testFileID,
-			userID: testUserID,
+			name:   "file not found",
+			fileID: "file123",
+			userID: "user123",
 			setupMocks: func() {
-				mockRepo.EXPECT().
-					GetByID(gomock.Any(), "test-file-id").
-					Return(nil, stderrors.New("not found"))
+				mockRepo.EXPECT().GetByID(gomock.Any(), "file123").Return(nil, apperrors.ErrNotFound)
 			},
-			expectedError: "not found",
+			expectedError: apperrors.ErrNotFound,
 		},
 		{
-			name:   "access_denied",
-			id:     testFileID,
-			userID: testUserID,
+			name:   "access denied",
+			fileID: "file123",
+			userID: "user456",
 			setupMocks: func() {
-				mockRepo.EXPECT().
-					GetByID(gomock.Any(), "test-file-id").
-					Return(&models.File{
-						ID:          testFileID,
-						UserID:      "other_user",
-						StorageType: "local",
-					}, nil)
+				fileRecord := &models.FileRecord{
+					ID:          "file123",
+					UserID:      "user123",
+					StorageType: "local",
+				}
+				mockRepo.EXPECT().GetByID(gomock.Any(), "file123").Return(fileRecord, nil)
 			},
-			expectedError: "access denied",
+			expectedError: apperrors.ErrAccessDenied,
 		},
 		{
-			name:   "unknown_storage_type",
-			id:     testFileID,
-			userID: testUserID,
+			name:   "storage error",
+			fileID: "file123",
+			userID: "user123",
 			setupMocks: func() {
-				mockRepo.EXPECT().
-					GetByID(gomock.Any(), "test-file-id").
-					Return(&models.File{
-						ID:          testFileID,
-						UserID:      testUserID,
-						StorageType: "unknown",
-					}, nil)
+				fileRecord := &models.FileRecord{
+					ID:          "file123",
+					UserID:      "user123",
+					StorageType: "local",
+				}
+				mockRepo.EXPECT().GetByID(gomock.Any(), "file123").Return(fileRecord, nil)
+				mockLocalStorage.EXPECT().Download(gomock.Any(), "file123").Return(nil, errors.New("storage error"))
 			},
-			expectedError: "unknown storage type: unknown",
+			expectedError: errors.New("failed to download file: storage error"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.setupMocks != nil {
-				tt.setupMocks()
-			}
+			tt.setupMocks()
 
-			reader, err := service.DownloadFile(context.Background(), tt.id, tt.userID)
+			reader, err := service.DownloadFile(context.Background(), tt.fileID, tt.userID)
 
-			if tt.expectedError != "" {
+			if tt.expectedError != nil {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), tt.expectedError)
-				return
-			}
-
-			assert.NoError(t, err)
-			assert.NotNil(t, reader)
-
-			if tt.verifyContent {
-				content, err := io.ReadAll(reader)
+				if errors.Is(err, apperrors.ErrNotFound) || errors.Is(err, apperrors.ErrAccessDenied) {
+					assert.ErrorIs(t, err, tt.expectedError)
+				} else {
+					assert.ErrorContains(t, err, tt.expectedError.Error())
+				}
+				assert.Nil(t, reader)
+			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, []byte(testContent), content)
+				assert.NotNil(t, reader)
+
+				data, err := io.ReadAll(reader)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedData, string(data))
+
+				err = reader.Close()
+				assert.NoError(t, err)
 			}
 		})
 	}
-}
-
-func TestService_UploadFile_ContextCancellation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := NewMockFileRepository(ctrl)
-	mockStorage := NewMockStorage(ctrl)
-	service := NewService(mockRepo, mockStorage)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
-	defer cancel()
-
-	file := createTestFile([]byte(testContent))
-	mockStorage.EXPECT().
-		Upload(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return("", context.DeadlineExceeded)
-
-	_, err := service.UploadFile(ctx, file, testUserID)
-
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
-}
-
-func TestService_DownloadFile_ContextCancellation(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockRepo := NewMockFileRepository(ctrl)
-	mockStorage := NewMockStorage(ctrl)
-	service := NewService(mockRepo, mockStorage)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
-	defer cancel()
-
-	mockRepo.EXPECT().
-		GetByID(gomock.Any(), gomock.Any()).
-		Return(nil, context.DeadlineExceeded)
-
-	_, err := service.DownloadFile(ctx, testFileID, testUserID)
-
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }
