@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"mime/multipart"
+	"mime/textproto"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -51,8 +52,13 @@ func TestFileFlow(t *testing.T) {
 	err = json.NewDecoder(resp.Body).Decode(&tokens)
 	require.NoError(t, err)
 
-	smallFileContent := []byte("This is a small test file")
+	// JPEG header bytes (valid minimal JPEG)
+	smallFileContent := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0xD9}
 	largeFileContent := make([]byte, 10<<20) // 10MB файл
+	copy(largeFileContent, smallFileContent) // начало файла - валидный JPEG
+	for i := len(smallFileContent); i < len(largeFileContent); i++ {
+		largeFileContent[i] = byte(i % 256)
+	}
 
 	smallFilePath := filepath.Join(t.TempDir(), "small.jpg")
 	largeFilePath := filepath.Join(t.TempDir(), "large.jpg")
@@ -69,7 +75,10 @@ func TestFileFlow(t *testing.T) {
 
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("file", "small.jpg")
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", `form-data; name="file"; filename="small.jpg"`)
+		h.Set("Content-Type", "image/jpeg")
+		part, err := writer.CreatePart(h)
 		require.NoError(t, err)
 		_, err = io.Copy(part, file)
 		require.NoError(t, err)
@@ -80,20 +89,18 @@ func TestFileFlow(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
-		req.Header.Set("X-File-Type", "image/jpeg")
 
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
-		var uploadedFile models.File
+		var uploadedFile models.FileResponse
 		err = json.NewDecoder(resp.Body).Decode(&uploadedFile)
 		require.NoError(t, err)
 		assert.NotEmpty(t, uploadedFile.ID)
-		assert.NotEmpty(t, uploadedFile.DownloadURL)
 
 		t.Run("download small file", func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, server.URL+uploadedFile.DownloadURL, nil)
+			req, err := http.NewRequest(http.MethodGet, server.URL+"/api/v1/files/"+uploadedFile.ID, nil)
 			require.NoError(t, err)
 			req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 
@@ -115,7 +122,10 @@ func TestFileFlow(t *testing.T) {
 
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("file", "large.jpg")
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", `form-data; name="file"; filename="large.jpg"`)
+		h.Set("Content-Type", "image/jpeg")
+		part, err := writer.CreatePart(h)
 		require.NoError(t, err)
 		_, err = io.Copy(part, file)
 		require.NoError(t, err)
@@ -126,20 +136,18 @@ func TestFileFlow(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
-		req.Header.Set("X-File-Type", "image/jpeg")
 
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusCreated, resp.StatusCode)
 
-		var uploadedFile models.File
+		var uploadedFile models.FileResponse
 		err = json.NewDecoder(resp.Body).Decode(&uploadedFile)
 		require.NoError(t, err)
 		assert.NotEmpty(t, uploadedFile.ID)
-		assert.NotEmpty(t, uploadedFile.DownloadURL)
 
 		t.Run("download large file", func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, server.URL+uploadedFile.DownloadURL, nil)
+			req, err := http.NewRequest(http.MethodGet, server.URL+"/api/v1/files/"+uploadedFile.ID, nil)
 			require.NoError(t, err)
 			req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 
@@ -172,11 +180,36 @@ func TestFileFlow(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
-		req.Header.Set("X-File-Type", "application/octet-stream")
 
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	})
+
+	t.Run("upload without auth", func(t *testing.T) {
+		file, err := os.Open(smallFilePath)
+		require.NoError(t, err)
+		defer file.Close()
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		h := make(textproto.MIMEHeader)
+		h.Set("Content-Disposition", `form-data; name="file"; filename="small.jpg"`)
+		h.Set("Content-Type", "image/jpeg")
+		part, err := writer.CreatePart(h)
+		require.NoError(t, err)
+		_, err = io.Copy(part, file)
+		require.NoError(t, err)
+		err = writer.Close()
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, server.URL+"/api/v1/files/upload", body)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
 	})
 
 	t.Run("download non-existent file", func(t *testing.T) {
